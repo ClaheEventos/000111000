@@ -1,0 +1,102 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productos - Sistema Amarce</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="bg-light">
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Inventario de Productos</h2>
+
+        <div>
+            <a href="{% url 'home' %}" class="btn btn-secondary">Volver</a>
+
+            {% if user.is_superuser or user.perfilusuario.tipo == "administrativo" %}
+                <a href="{% url 'crear_tipo' %}" class="btn btn-success">+ Nuevo Tipo</a>
+                <a href="{% url 'crear_producto' %}" class="btn btn-primary">+ Nuevo Producto</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="card p-3 mb-4 shadow-sm">
+        <form method="GET" class="row g-2">
+            <div class="col-md-6">
+                <input type="text" name="nombre" class="form-control"
+                       placeholder="Buscar por nombre..."
+                       value="{{ query_nombre|default:'' }}">
+            </div>
+            <div class="col-md-4">
+                <select name="tipo" class="form-select">
+                    <option value="">Todos los tipos</option>
+                    {% for t in tipos %}
+                        <option value="{{ t.id }}"
+                                {% if query_tipo == t.id|stringformat:"s" %}selected{% endif %}>
+                            {{ t.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-dark w-100">Filtrar</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- TABLA -->
+    <table class="table table-bordered bg-white shadow-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Stock</th>
+                <th>Precio</th>
+
+                {% if user.is_superuser or user.perfilusuario.tipo == "administrativo" %}
+                    <th>Acciones</th>
+                {% endif %}
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for p in productos %}
+            <tr {% if p.cantidad < p.umbral_alerta %}class="table-danger"{% endif %}>
+                <td>{{ p.nombre }}</td>
+                <td>{{ p.tipo.nombre }}</td>
+                <td><strong>{{ p.cantidad }}</strong></td>
+                <td>${{ p.valor }}</td>
+
+                {% if user.is_superuser or user.perfilusuario.tipo == "administrativo" %}
+                <td>
+                    <a href="{% url 'actualizar_stock' p.id %}"
+                       class="btn btn-sm btn-outline-success">
+                        Stock +/-
+                    </a>
+                    <a href="{% url 'editar_producto' p.id %}"
+                       class="btn btn-sm btn-outline-primary">
+                        Editar
+                    </a>
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center text-muted">
+                    No hay productos registrados
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+
+</body>
+</html>

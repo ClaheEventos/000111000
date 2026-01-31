@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <title>Actualizar Estado - Envío #{{ envio.id }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .envio-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .envio-info h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .info-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+        
+        .info-item strong {
+            min-width: 100px;
+        }
+        
+        .estado-actual {
+            background: #fff9e6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            text-align: center;
+            border: 2px dashed #f39c12;
+        }
+        
+        .estado-actual strong {
+            display: block;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .estado-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .estado-pendiente {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .estado-en_camino {
+            background: #cfe2ff;
+            color: #084298;
+        }
+        
+        .estado-entregado {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .estado-cancelado {
+            background: #f8d7da;
+            color: #842029;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .radio-option:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+        
+        .radio-option input[type="radio"] {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .radio-option.selected {
+            background: #e7f0ff;
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+        
+        .radio-label {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        
+        .radio-icon {
+            font-size: 24px;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background: #d1e7dd;
+            color: #0f5132;
+            border-left: 4px solid #0f5132;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Actualizar Estado del Envío</h1>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        
+        <div class="envio-info">
+            <h3>📦 Información del Envío #{{ envio.id }}</h3>
+            <div class="info-item">
+                <strong>Cliente:</strong>
+                <span>{{ envio.cliente.nombre_completo }}</span>
+            </div>
+            <div class="info-item">
+                <strong>Chofer:</strong>
+                <span>{{ envio.chofer.nombre_completo }}</span>
+            </div>
+            <div class="info-item">
+                <strong>Fecha:</strong>
+                <span>{{ envio.fecha_envio|date:"d/m/Y" }} - {{ envio.hora_estimada|time:"H:i" }}</span>
+            </div>
+        </div>
+        
+        <div class="estado-actual">
+            <strong>Estado Actual:</strong>
+            <span class="estado-badge estado-{{ envio.estado }}">
+                {% if envio.estado == 'pendiente' %}⏳ Pendiente
+                {% elif envio.estado == 'en_camino' %}🚚 En Camino
+                {% elif envio.estado == 'entregado' %}✅ Entregado
+                {% elif envio.estado == 'cancelado' %}❌ Cancelado
+                {% endif %}
+            </span>
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label>Seleccione el nuevo estado:</label>
+                <div class="radio-group">
+                    {% for value, label in estados %}
+                        <label class="radio-option {% if envio.estado == value %}selected{% endif %}">
+                            <input type="radio" name="estado" value="{{ value }}" 
+                                   {% if envio.estado == value %}checked{% endif %}
+                                   onchange="this.closest('.radio-option').parentElement.querySelectorAll('.radio-option').forEach(el => el.classList.remove('selected')); this.closest('.radio-option').classList.add('selected');">
+                            <span class="radio-label">
+                                <span class="radio-icon">
+                                    {% if value == 'pendiente' %}⏳
+                                    {% elif value == 'en_camino' %}🚚
+                                    {% elif value == 'entregado' %}✅
+                                    {% elif value == 'cancelado' %}❌
+                                    {% endif %}
+                                </span>
+                                <span>{{ label }}</span>
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="buttons">
+                <button type="submit" class="btn btn-primary">💾 Actualizar Estado</button>
+                <a href="{% url 'detalle_envio' envio.id %}" class="btn btn-secondary">❌ Cancelar</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

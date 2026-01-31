@@ -1,0 +1,169 @@
+<!-- 4. templates/choferes/cambiar_estado.html -->
+<!-- ================================== -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambiar Estado - Envío #{{ envio.id }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f6fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .form-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .estado-actual {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .badge {
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .badge.pendiente {
+            background: #ffa502;
+            color: white;
+        }
+        .badge.en_camino {
+            background: #3742fa;
+            color: white;
+        }
+        .badge.entregado {
+            background: #2ed573;
+            color: white;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 28px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .help-text {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✏️ Cambiar Estado del Envío</h1>
+            <p>Envío #{{ envio.id }} - {{ envio.venta.cliente.nombre_completo }}</p>
+        </div>
+
+        <div class="form-container">
+            <div class="estado-actual">
+                <p style="color: #666; margin-bottom: 10px;">Estado Actual:</p>
+                <span class="badge {{ envio.estado }}">{{ envio.get_estado_display }}</span>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="estado">Nuevo Estado:</label>
+                    <select name="estado" id="estado" required>
+                        <option value="">Seleccione un estado...</option>
+                        {% for valor, nombre in estados %}
+                            <option value="{{ valor }}" {% if valor == envio.estado %}selected{% endif %}>
+                                {{ nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="help-text">Selecciona el nuevo estado del envío</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="notas_adicionales">Notas Adicionales (opcional):</label>
+                    <textarea name="notas_adicionales" id="notas_adicionales" 
+                              placeholder="Ej: Cliente no estaba, dejado con vecino, etc."></textarea>
+                    <p class="help-text">Agrega cualquier observación sobre este envío</p>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" class="btn">✅ Guardar Cambios</button>
+                    <a href="{% url 'chofer_detalle_envio' envio.id %}" class="btn btn-secondary">← Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,162 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Stockarce</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        /* Ajustes específicos para que los iconos se vean premium sin animaciones locas */
+        .icon-box {
+            width: 50px;
+            height: 50px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-md);
+            font-size: 1.5rem;
+            margin-bottom: var(--space-md);
+            background-color: var(--bg-hover);
+        }
+        
+        /* Contenedor de la cuadrícula principal */
+        .panel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--space-lg);
+            margin-top: var(--space-xl);
+        }
+
+        /* Estilo de la Card de Menú */
+        .menu-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: var(--space-xl) !important;
+            height: 100%;
+        }
+
+        .menu-card h5 {
+            margin-bottom: var(--space-lg);
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <header class="navbar">
+        <div class="navbar-brand">
+            <span>📦</span> STOCKARCE
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-end d-none d-sm-block">
+                <span class="fw-bold d-block">{{ user.username|upper }}</span>
+                <small class="text-muted">
+                    {% if user.perfilusuario.tipo == "camiones" %} Chofer 
+                    {% elif user.perfilusuario.tipo == "ventas" %} Ventas
+                    {% else %} Administración {% endif %}
+                </small>
+            </div>
+            <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm">Salir</a>
+        </div>
+    </header>
+
+    <main>
+        
+        <div class="lista-header">
+            <h1>Panel de Control</h1>
+            <p class="text-muted w-100">Bienvenido al sistema de gestión integral.</p>
+        </div>
+
+        {% if user.perfilusuario.tipo == "camiones" %}
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card menu-card border-warning">
+                    <div class="icon-box" style="background: #fffbeb; color: #d97706;">🚚</div>
+                    <h3>Panel de Logística</h3>
+                    <p class="text-muted mb-4">Accedé a tus hojas de ruta y entregas pendientes.</p>
+                    <a href="{% url 'panel_chofer' %}" class="btn btn-warning w-100">Ingresar al Panel</a>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+
+        <div class="panel-grid">
+
+            {% if user.perfilusuario.tipo == "administrativo" or user.perfilusuario.tipo == "ventas" or user.is_superuser %}
+            <div class="card menu-card">
+                <div class="icon-box" style="background: #eef2ff; color: #6366f1;">📦</div>
+                <h5>Inventario</h5>
+                <a href="{% url 'lista_productos' %}" class="btn btn-primary w-100">Ver Stock</a>
+            </div>
+            {% endif %}
+
+            {% if user.perfilusuario.tipo == "ventas" or user.is_superuser %}
+            <div class="card menu-card">
+                <div class="icon-box" style="background: #ecfdf5; color: #10b981;">💰</div>
+                <h5>Ventas</h5>
+                <a href="{% url 'lista_ventas' %}" class="btn btn-success w-100">Pedidos</a>
+            </div>
+            {% endif %}
+
+            {% if user.perfilusuario.tipo == "administrativo" or user.is_superuser %}
+            <div class="card menu-card">
+                <div class="icon-box" style="background: #eff6ff; color: #3b82f6;">🚚</div>
+                <h5>Envíos</h5>
+                <a href="{% url 'lista_envios' %}" class="btn btn-info w-100">Logística</a>
+            </div>
+            {% endif %}
+
+            {% if user.perfilusuario.tipo == "administrativo" or user.is_superuser %}
+            <div class="card menu-card">
+                <div class="icon-box" style="background: #fffbeb; color: #f59e0b;">👷</div>
+                <h5>Choferes</h5>
+                <a href="{% url 'lista_choferes' %}" class="btn btn-warning w-100">Gestionar</a>
+            </div>
+            {% endif %}
+
+            {% if user.perfilusuario.tipo == "administrativo" or user.perfilusuario.tipo == "ventas" or user.is_superuser %}
+            <div class="card menu-card">
+                <div class="icon-box" style="background: #f1f5f9; color: #64748b;">👥</div>
+                <h5>Clientes</h5>
+                <a href="/clientes/" class="btn btn-secondary w-100">Cartera</a>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <div class="row mt-5 g-3">
+            <div class="col-md-12">
+                <h4 class="text-muted mb-3">Acciones Rápidas</h4>
+            </div>
+            
+            {% if user.perfilusuario.tipo == "ventas" or user.is_superuser %}
+            <div class="col-md-6">
+                <a href="{% url 'crear_venta' %}" class="btn btn-primary btn-lg w-100" style="background: linear-gradient(to right, var(--primary-color), var(--info-color)); border: none;">
+                    ➕ Registrar Nueva Venta
+                </a>
+            </div>
+            {% endif %}
+
+            {% if user.perfilusuario.tipo == "administrativo" or user.is_superuser %}
+            <div class="col-md-6">
+                <a href="{% url 'consultar_ventas' %}" class="btn btn-secondary btn-lg w-100">
+                    📊 Ver Reporte Mensual
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        {% endif %}
+
+    </main>
+</div>
+
+</body>
+</html>

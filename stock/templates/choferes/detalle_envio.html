@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <title>Envío #{{ envio.id }}</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #1a1a1a;
+        }
+
+        /* Botón volver discreto */
+        .btn-volver {
+            display: inline-block;
+            padding: 10px 0;
+            color: #6c757d;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        /* Bloques de información sencilla */
+        .main-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #eee;
+        }
+
+        .label-mini {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #888;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .info-valor {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .direccion-destacada {
+            font-size: 1.3rem;
+            color: #007bff;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        /* Tabla de productos simple */
+        .producto-fila {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f1f1;
+            font-size: 0.95rem;
+        }
+
+        /* Bloque de Total */
+        .total-box {
+            background: #e7f1ff;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .total-monto {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0056b3;
+        }
+
+        /* Formulario directo */
+        .form-control-lg {
+            border-radius: 10px;
+            font-size: 1rem;
+            border: 2px solid #eee;
+        }
+
+        .btn-update {
+            background: #28a745;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-top: 15px;
+        }
+
+        .badge-estado-actual {
+            background: #6c757d;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-2">
+    
+    <a href="{% url 'panel_chofer' %}" class="btn-volver">← Volver al listado</a>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h4 mb-0 fw-bold">Pedido #{{ envio.id }}</h2>
+        <span class="badge-estado-actual">{{ envio.get_estado_display }}</span>
+    </div>
+
+    <div class="main-card">
+        <span class="label-mini">Dirección de Entrega</span>
+        <div class="direccion-destacada mb-3">{{ envio.direccion_entrega }}</div>
+        
+        <span class="label-mini">Cliente</span>
+        <div class="info-valor">{{ envio.venta.cliente.nombre_completo }}</div>
+        
+        <div class="row">
+            <div class="col-6">
+                <span class="label-mini">Hora Est.</span>
+                <div class="info-valor mb-0">{{ envio.hora_estimada|default:"--" }}</div>
+            </div>
+            <div class="col-6 text-end">
+                <a href="https://www.google.com/maps/search/?api=1&query={{ envio.direccion_entrega|urlencode }}" 
+                   target="_blank" class="btn btn-sm btn-outline-primary">Ver en Mapa</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-card">
+        <span class="label-mini">Productos</span>
+        {% for detalle in detalles %}
+        <div class="producto-fila">
+            <span><strong>{{ detalle.cantidad }}</strong> x {{ detalle.producto.nombre }}</span>
+            <span class="text-muted">${{ detalle.subtotal }}</span>
+        </div>
+        {% endfor %}
+        
+        <div class="total-box">
+            <span class="fw-bold">COBRAR:</span>
+            <span class="total-monto">${{ envio.venta.valor_total }}</span>
+        </div>
+    </div>
+
+    <div class="main-card" style="border-top: 4px solid #28a745;">
+        <span class="label-mini">Actualizar Estado</span>
+        <form method="POST" action="{% url 'chofer_cambiar_estado_envio' envio.id %}">
+            {% csrf_token %}
+            
+            <select name="estado" class="form-select form-control-lg mb-3" required>
+                {% for valor, nombre in estados %}
+                    <option value="{{ valor }}" {% if envio.estado == valor %}selected{% endif %}>
+                        {{ nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <textarea name="notas_adicionales" 
+                      class="form-control mb-2" 
+                      placeholder="Notas opcionales..." 
+                      rows="2"></textarea>
+
+            <button type="submit" class="btn-update">✓ GUARDAR CAMBIOS</button>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>

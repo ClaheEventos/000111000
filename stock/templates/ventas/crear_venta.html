@@ -1,0 +1,213 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear Venta - Sistema Amarce</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        .stock-error {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+        .stock-error.show {
+            display: block;
+        }
+        .cantidad-input.error {
+            border-color: #dc3545;
+        }
+        .stock-ok {
+            color: #28a745;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+        .stock-ok.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container mt-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">📝 Nueva Venta / Pedido</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="form-venta">
+                    {% csrf_token %}
+                    
+                    <!-- Cliente -->
+                    <div class="mb-3">
+                        <label class="form-label">Cliente <span class="text-danger">*</span></label>
+                        <select name="cliente" class="form-select" required>
+                            <option value="">Seleccione un cliente</option>
+                            {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}">{{ cliente }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Productos -->
+                    <div class="mb-3">
+                        <label class="form-label">Productos <span class="text-danger">*</span></label>
+                        <div id="productos-container">
+                            <div class="row mb-2 producto-item">
+                                <div class="col-md-8">
+                                    <select name="productos" class="form-select producto-select" required>
+                                        <option value="">Seleccione producto</option>
+                                        {% for producto in productos %}
+                                        <option value="{{ producto.id }}" 
+                                                data-precio="{{ producto.valor }}" 
+                                                data-stock="{{ producto.cantidad }}">
+                                            {{ producto.nombre }} - ${{ producto.valor }} (Stock: {{ producto.cantidad }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="number" name="cantidades" class="form-control cantidad-input" 
+                                           placeholder="Cantidad" min="1" required>
+                                    <div class="stock-error">⚠️ Stock insuficiente</div>
+                                    <div class="stock-ok">✓ Stock disponible</div>
+                                </div>
+                                <div class="col-md-1">
+                                    <button type="button" class="btn btn-danger btn-sm remove-producto" disabled>✕</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="agregar-producto">
+                            + Agregar otro producto
+                        </button>
+                    </div>
+
+                    <!-- Notas -->
+                    <div class="mb-3">
+                        <label class="form-label">Notas / Observaciones</label>
+                        <textarea name="notas" class="form-control" rows="3" 
+                                  placeholder="Información adicional sobre el pedido..."></textarea>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="btn-crear-venta">
+                            Crear Venta
+                        </button>
+                        <a href="{% url 'lista_ventas' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script>
+        // ✅ VALIDACIÓN DE STOCK EN TIEMPO REAL
+        function validarStock(productoItem) {
+            const select = productoItem.querySelector('.producto-select');
+            const input = productoItem.querySelector('.cantidad-input');
+            const errorMsg = productoItem.querySelector('.stock-error');
+            const okMsg = productoItem.querySelector('.stock-ok');
+            
+            const selectedOption = select.options[select.selectedIndex];
+            const stockDisponible = parseInt(selectedOption.getAttribute('data-stock')) || 0;
+            const cantidadPedida = parseInt(input.value) || 0;
+            
+            // Resetear mensajes
+            errorMsg.classList.remove('show');
+            okMsg.classList.remove('show');
+            input.classList.remove('error');
+            
+            if (select.value && cantidadPedida > 0) {
+                if (cantidadPedida > stockDisponible) {
+                    // ❌ Stock insuficiente
+                    errorMsg.textContent = `⚠️ Solo hay ${stockDisponible} disponibles`;
+                    errorMsg.classList.add('show');
+                    input.classList.add('error');
+                    return false;
+                } else {
+                    // ✅ Stock suficiente
+                    okMsg.textContent = `✓ Stock OK (${stockDisponible} disponibles)`;
+                    okMsg.classList.add('show');
+                    return true;
+                }
+            }
+            
+            return true;
+        }
+        
+        // ✅ VALIDAR TODO EL FORMULARIO
+        function validarFormularioCompleto() {
+            const items = document.querySelectorAll('.producto-item');
+            let todoBien = true;
+            
+            items.forEach(item => {
+                const select = item.querySelector('.producto-select');
+                const input = item.querySelector('.cantidad-input');
+                
+                if (select.value && input.value) {
+                    if (!validarStock(item)) {
+                        todoBien = false;
+                    }
+                }
+            });
+            
+            // Habilitar/deshabilitar botón
+            const btnCrear = document.getElementById('btn-crear-venta');
+            btnCrear.disabled = !todoBien;
+            
+            return todoBien;
+        }
+        
+        // ✅ EVENTOS: Validar cuando cambia producto o cantidad
+        document.getElementById('productos-container').addEventListener('change', function(e) {
+            if (e.target.classList.contains('producto-select') || e.target.classList.contains('cantidad-input')) {
+                const item = e.target.closest('.producto-item');
+                validarStock(item);
+                validarFormularioCompleto();
+            }
+        });
+        
+        document.getElementById('productos-container').addEventListener('input', function(e) {
+            if (e.target.classList.contains('cantidad-input')) {
+                const item = e.target.closest('.producto-item');
+                validarStock(item);
+                validarFormularioCompleto();
+            }
+        });
+        
+        // ✅ PREVENIR SUBMIT SI HAY ERRORES
+        document.getElementById('form-venta').addEventListener('submit', function(e) {
+            if (!validarFormularioCompleto()) {
+                e.preventDefault();
+                alert('❌ No se puede crear la venta: hay productos con stock insuficiente');
+            }
+        });
+        
+        // ✅ AGREGAR PRODUCTOS DINÁMICAMENTE
+        document.getElementById('agregar-producto').addEventListener('click', function() {
+            const container = document.getElementById('productos-container');
+            const item = container.querySelector('.producto-item').cloneNode(true);
+            
+            item.querySelectorAll('select, input').forEach(el => el.value = '');
+            item.querySelector('.remove-producto').disabled = false;
+            item.querySelector('.stock-error').classList.remove('show');
+            item.querySelector('.stock-ok').classList.remove('show');
+            item.querySelector('.cantidad-input').classList.remove('error');
+            
+            container.appendChild(item);
+        });
+
+        // ✅ ELIMINAR PRODUCTOS
+        document.getElementById('productos-container').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-producto')) {
+                e.target.closest('.producto-item').remove();
+                validarFormularioCompleto();
+            }
+        });
+    </script>
+</body>
+</html>

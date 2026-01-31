@@ -1,0 +1,133 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Producto - Sistema Amarce</title>
+
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Editar Producto</h4>
+                </div>
+
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <!-- Nombre -->
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Producto</label>
+                            <input type="text" name="nombre" class="form-control"
+                                   value="{{ producto.nombre }}" required>
+                        </div>
+
+                        <!-- Categoría -->
+                        <div class="mb-3">
+                            <label class="form-label">Tipo / Categoría</label>
+                            <select name="tipo" class="form-select" required>
+                                {% for t in tipos %}
+                                <option value="{{ t.id }}"
+                                    {% if t.id == producto.tipo.id %}selected{% endif %}>
+                                    {{ t.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Cantidad (opcional editable) -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Cantidad</label>
+                                <input type="number" name="cantidad" class="form-control"
+                                       value="{{ producto.cantidad }}">
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Precio de Compra</label>
+                                <input type="number" step="0.01" name="valor_compra"
+                                       class="form-control"
+                                       value="{{ producto.valor_compra }}">
+                            </div>
+                        </div>
+
+                        <!-- Precio venta + alerta -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Precio de Venta</label>
+                                <input type="number" step="0.01" name="valor"
+                                       class="form-control"
+                                       value="{{ producto.valor }}" required>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Umbral de Alerta</label>
+                                <input type="number" name="umbral_alerta"
+                                       class="form-control"
+                                       value="{{ producto.umbral_alerta }}">
+                            </div>
+                        </div>
+
+                        <!-- Ganancia -->
+                        <div class="alert alert-info">
+                            <small class="text-muted">
+                                <strong>💰 Ganancia estimada:</strong>
+                                <span id="ganancia">$0.00</span> |
+                                <strong>📊 Margen:</strong>
+                                <span id="margen">0%</span>
+                            </small>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                Actualizar Producto
+                            </button>
+                            <a href="{% url 'lista_productos' %}"
+                               class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JS GANANCIA -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const compra = document.querySelector('input[name="valor_compra"]');
+    const venta = document.querySelector('input[name="valor"]');
+    const gananciaSpan = document.getElementById('ganancia');
+    const margenSpan = document.getElementById('margen');
+
+    function calcular() {
+        const c = parseFloat(compra.value) || 0;
+        const v = parseFloat(venta.value) || 0;
+        const g = v - c;
+
+        gananciaSpan.textContent = '$' + g.toFixed(2);
+        const m = c > 0 ? ((g / c) * 100).toFixed(1) : 0;
+        margenSpan.textContent = m + '%';
+    }
+
+    compra.addEventListener('input', calcular);
+    venta.addEventListener('input', calcular);
+
+    calcular();
+});
+</script>
+
+</body>
+</html>

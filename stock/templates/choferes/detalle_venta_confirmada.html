@@ -1,0 +1,120 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle de Venta #{{ venta.id }}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+    <div class="container">
+        <header class="navbar">
+            <div class="navbar-brand">
+                <span>🚚</span> DETALLE DE ENTREGA
+            </div>
+            <a href="{% url 'panel_chofer' %}" class="btn btn-secondary btn-sm">Atrás</a>
+        </header>
+
+        <div class="lista-header">
+            <h1>Venta #{{ venta.id }}</h1>
+            <span class="btn {% if venta.estado == 'entregado' %}btn-success{% elif venta.estado == 'cancelado' %}btn-danger{% else %}btn-warning{% endif %} btn-sm">
+                {{ venta.get_estado_display|upper }}
+            </span>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card p-4 mb-4">
+                    <h3>📍 Datos de Entrega</h3>
+                    <hr>
+                    <p><strong>Cliente:</strong> {{ venta.cliente.nombre_completo }}</p>
+                    <p><strong>Dirección:</strong> <span class="text-primary fw-bold">{{ venta.cliente.direccion }}</span></p>
+                    <p><strong>Fecha:</strong> {{ venta.fecha_envio_programada|default:"Sin fecha" }}</p>
+                    <p><strong>Hora:</strong> {{ venta.hora_envio_programada|default:"Sin hora" }}</p>
+                    
+                    {% if venta.notas %}
+                    <div class="alert alert-warning mt-3">
+                        <strong>Notas:</strong> {{ venta.notas }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card p-4 mb-4">
+                    <h3>📦 Productos</h3>
+                    <hr>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Cant.</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detalle in detalles %}
+                                <tr>
+                                    <td data-label="Item">{{ detalle.producto.nombre }}</td>
+                                    <td data-label="Cant.">{{ detalle.cantidad }}</td>
+                                    <td data-label="Subtotal">${{ detalle.subtotal }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="stock-display mt-3">
+                        <strong>Total a Cobrar</strong>
+                        ${{ venta.valor_total }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-8">
+                <div class="card p-4 border-primary">
+                    <h3 class="text-center">🔄 Actualizar Estado</h3>
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Estado de la Entrega:</label>
+                            <select name="estado" class="form-select" required>
+                                {% for valor, nombre in estados %}
+                                    <option value="{{ valor }}" {% if venta.estado == valor %}selected{% endif %}>
+                                        {{ nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Comentarios del Chofer:</label>
+                            <textarea name="notas_adicionales" class="form-control" rows="3" placeholder="Ej: No había nadie, se dejó al vecino..."></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100 btn-lg">
+                            CONFIRMAR CAMBIO
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Esto asegura que en móvil se vea "Item: Producto" en lugar de solo el valor
+        document.querySelectorAll('td').forEach(td => {
+            if (!td.getAttribute('data-label')) {
+                const index = td.cellIndex;
+                const head = td.closest('table').querySelector('th:nth-child(' + (index + 1) + ')');
+                if (head) td.setAttribute('data-label', head.innerText);
+            }
+        });
+    </script>
+</body>
+</html>

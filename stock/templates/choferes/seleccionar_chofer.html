@@ -1,0 +1,32 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar Chofer</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>🚚 Selecciona tu Usuario</h1>
+        
+        {% for chofer in choferes %}
+        <div class="chofer-card" onclick="window.location.href='?chofer_id={{ chofer.id }}'">
+            <div class="chofer-info">
+                <h3>{{ chofer.nombre_completo }}</h3>
+                <p>🚗 {{ chofer.vehiculo }}</p>
+            </div>
+            <div class="icon">👤</div>
+        </div>
+        {% endfor %}
+        
+        {% if not choferes %}
+        <div class="empty-state">
+            <p>No hay choferes activos disponibles.</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

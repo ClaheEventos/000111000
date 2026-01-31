@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <title>Detalle Venta #{{ venta.id }} - Sistema Amarce</title>
+</head>
+<body class="bg-light">
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <!-- Información de la Venta -->
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">📋 Venta #{{ venta.id }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Cliente:</strong> {{ venta.cliente.nombre_completo }}</p>
+                                {% if venta.cliente.nombre_local %}
+                                <p><strong>Local:</strong> {{ venta.cliente.nombre_local }}</p>
+                                {% endif %}
+                                <p><strong>Dirección:</strong> {{ venta.cliente.direccion|default:"Sin dirección" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Fecha Creación:</strong> {{ venta.fecha_creacion|date:"d/m/Y H:i" }}</p>
+                                <p><strong>Estado:</strong> 
+                                    {% if venta.estado == 'pendiente' %}
+                                        <span class="badge bg-danger">{{ venta.get_estado_display }}</span>
+                                    {% elif venta.estado == 'confirmada' %}
+                                        <span class="badge bg-warning text-dark">{{ venta.get_estado_display }}</span>
+                                    {% elif venta.estado == 'enviada' %}
+                                        <span class="badge bg-info">{{ venta.get_estado_display }}</span>
+                                    {% elif venta.estado == 'entregada' %}
+                                        <span class="badge bg-success">{{ venta.get_estado_display }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ venta.get_estado_display }}</span>
+                                    {% endif %}
+                                </p>
+                                <p><strong>Total:</strong> <h4>${{ venta.valor_total }}</h4></p>
+                            </div>
+                        </div>
+
+                        {% if venta.notas %}
+                        <div class="alert alert-info">
+                            <strong>Notas:</strong> {{ venta.notas }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Productos -->
+                        <h5 class="border-bottom pb-2 mb-3">Productos</h5>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Cantidad</th>
+                                    <th>Precio Unit.</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detalle in detalles %}
+                                <tr>
+                                    <td>{{ detalle.producto.nombre }}</td>
+                                    <td>{{ detalle.cantidad }}</td>
+                                    <td>${{ detalle.precio_unitario }}</td>
+                                    <td><strong>${{ detalle.subtotal }}</strong></td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-dark">
+                                    <td colspan="3" class="text-end"><strong>TOTAL:</strong></td>
+                                    <td><strong>${{ venta.valor_total }}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Botones de Acción -->
+                        <div class="d-grid gap-2">
+                            {% if venta.estado == 'pendiente' or venta.estado == 'confirmada' %}
+                                <a href="{% url 'crear_envio' venta.id %}" class="btn btn-success btn-lg">
+                                    🚚 Crear Envío
+                                </a>
+                            {% endif %}
+                            
+                            <a href="{% url 'lista_ventas' %}" class="btn btn-secondary">Volver a Ventas</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <!-- Cambiar Estado -->
+                {% if venta.estado in 'pendiente,confirmada' %}
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0">🔄 Cambiar Estado</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{% url 'actualizar_estado_venta' venta.id %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label">Nuevo Estado</label>
+                                <select name="estado" class="form-select" required>
+                                    {% if venta.estado == 'pendiente' %}
+                                        <option value="confirmada">Confirmar Venta</option>
+                                        <option value="cancelada">Cancelar</option>
+                                    {% elif venta.estado == 'confirmada' %}
+                                        <option value="pendiente">Volver a Pendiente</option>
+                                        <option value="cancelada">Cancelar</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100">Actualizar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Asignar Chofer y Fecha -->
+                {% if venta.estado in 'pendiente,confirmada' %}
+                <div class="card shadow">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">👤 Asignar Chofer</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{% url 'asignar_chofer_venta' venta.id %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label">Chofer</label>
+                                <select name="chofer" class="form-select">
+                                    <option value="">Sin asignar</option>
+                                    {% for chofer in choferes %}
+                                    <option value="{{ chofer.id }}" {% if venta.chofer.id == chofer.id %}selected{% endif %}>
+                                        {{ chofer.nombre_completo }} - {{ chofer.vehiculo }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Fecha Programada</label>
+                                <input type="date" name="fecha_envio_programada" class="form-control" 
+                                       value="{{ venta.fecha_envio_programada|date:'Y-m-d' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Hora Programada</label>
+                                <input type="time" name="hora_envio_programada" class="form-control" 
+                                       value="{{ venta.hora_envio_programada|time:'H:i' }}">
+                            </div>
+                            <button type="submit" class="btn btn-info w-100">Guardar Asignación</button>
+                        </form>
+
+                        {% if venta.chofer %}
+                        <div class="alert alert-success mt-3 mb-0">
+                            <small>
+                                <strong>Asignado:</strong><br>
+                                {{ venta.chofer.nombre_completo }}<br>
+                                {% if venta.fecha_envio_programada %}
+                                📅 {{ venta.fecha_envio_programada }}<br>
+                                {% endif %}
+                                {% if venta.hora_envio_programada %}
+                                🕐 {{ venta.hora_envio_programada }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Info del Envío (si existe) -->
+                {% if venta.estado in 'enviada,entregada' and venta.envio %}
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">📦 Envío</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Chofer:</strong> {{ venta.envio.chofer.nombre_completo }}</p>
+                        <p><strong>Fecha:</strong> {{ venta.envio.fecha_envio }}</p>
+                        <p><strong>Hora:</strong> {{ venta.envio.hora_estimada }}</p>
+                        <p><strong>Estado:</strong> 
+                            <span class="badge bg-success">{{ venta.envio.get_estado_display }}</span>
+                        </p>
+                        <a href="{% url 'detalle_envio' venta.envio.id %}" class="btn btn-success w-100">
+                            Ver Detalle del Envío
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

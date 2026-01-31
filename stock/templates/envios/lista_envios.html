@@ -1,0 +1,141 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Envíos</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+        <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+    <style>
+        .estado-badge {
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            color: white;
+        }
+        .estado-pendiente { background-color: #ef4444; }   /* rojo */
+        .estado-en_camino { background-color: #f59e0b; }   /* naranja */
+        .estado-entregado { background-color: #10b981; }   /* verde */
+        .estado-cancelado { background-color: #6b7280; }   /* gris */
+    </style>
+</head>
+<body class="bg-light p-4">
+
+<div class="container">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🚚 Envíos Activos</h2>
+        <div class="d-flex gap-2">
+            <a href="{% url 'asignar_envios_pendientes' %}" class="btn btn-warning">
+                ⚠️ Ver Ventas Pendientes de Envío
+            </a>
+            <a href="{% url 'lista_choferes' %}" class="btn btn-outline-primary">Gestionar Choferes</a>
+            <a href="{% url 'home' %}" class="btn btn-secondary">Volver al Inicio</a>
+        </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="card p-3 mb-4">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label>Fecha</label>
+                <input type="date" name="fecha" class="form-control" value="{{ fecha }}">
+            </div>
+            <div class="col-md-3">
+                <label>Chofer</label>
+                <select name="chofer" class="form-select">
+                    <option value="">Todos</option>
+                    {% for c in choferes %}
+                        <option value="{{ c.id }}" {% if chofer_id == c.id|stringformat:"s" %}selected{% endif %}>
+                            {{ c.nombre_completo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Estado</label>
+                <select name="estado" class="form-select">
+                    <option value="">Todos</option>
+                    {% for v, n in estados %}
+                        <option value="{{ v }}" {% if estado == v %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-dark w-100">Buscar</button>
+            </div>
+        </form>
+    </div>
+
+    {% if not hay_filtros %}
+        <div class="alert alert-info text-center">
+            🔍 Usá los filtros y presioná <strong>Buscar</strong> para cargar los envíos
+        </div>
+    {% else %}
+        <!-- ESTADÍSTICAS -->
+        <div class="row mb-3">
+            <div class="col">Total: <strong>{{ total_envios }}</strong></div>
+            <div class="col">Pendientes: <strong>{{ envios_pendientes }}</strong></div>
+            <div class="col">En camino: <strong>{{ envios_en_camino }}</strong></div>
+            <div class="col">Entregados: <strong>{{ envios_entregados }}</strong></div>
+        </div>
+
+        <!-- TABLA -->
+        <div class="card shadow-sm">
+            <table class="table table-hover mb-0 align-middle text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th># Envío</th>
+                        <th>Cliente</th>
+                        <th>Dirección</th>
+                        <th>Chofer</th>
+                        <th>Hora Estimada</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for envio in envios %}
+                        <tr>
+                            <td>{{ envio.id }}</td>
+                            <td>{{ envio.venta.cliente.nombre_completo }}</td>
+                            <td>{{ envio.direccion_entrega }}</td>
+                            <td>{{ envio.chofer.nombre_completo }}</td>
+                            <td>{{ envio.hora_estimada|time:"H:i" }}</td>
+                            <td>
+                                <span class="estado-badge estado-{{ envio.estado }}">
+                                    {{ envio.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if envio.estado == 'pendiente' %}
+                                    <a href="{% url 'chofer_detalle_envio' envio.id %}" class="btn btn-sm btn-danger">
+                                        🚚 Iniciar
+                                    </a>
+                                {% elif envio.estado == 'en_camino' %}
+                                    <a href="{% url 'chofer_detalle_envio' envio.id %}" class="btn btn-sm btn-warning">
+                                        ✅ Entregar
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No se encontraron envíos
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+
+<script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

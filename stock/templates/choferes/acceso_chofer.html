@@ -1,0 +1,219 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Elegí tu usuario</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+
+    <style>
+        /* Fondo claro y tipografía moderna */
+        body {
+            background-color: #f8f9fa;
+            color: #333;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .main-title {
+            font-weight: 700;
+            color: #2d3436;
+            margin-top: 60px;
+            letter-spacing: -0.5px;
+        }
+
+        .chofer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 25px;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 0 20px;
+        }
+
+        /* Tarjetas con diseño limpio y sombra suave */
+        .chofer-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 30px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid #eaeaea;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+
+        .chofer-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.08);
+            border-color: #007bff;
+        }
+
+        /* Avatar más colorido y profesional */
+        .chofer-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 35px;
+            margin: 0 auto 15px;
+            transition: background 0.3s ease;
+        }
+
+        .chofer-card:hover .chofer-avatar {
+            background: #e7f1ff;
+        }
+
+        .chofer-nombre {
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        /* MODAL PIN - Estilo Glassmorphism claro */
+        .pin-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .pin-box {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            border: 1px solid #eee;
+        }
+
+        .pin-input {
+            font-size: 28px;
+            text-align: center;
+            letter-spacing: 10px;
+            border-radius: 12px;
+            border: 2px solid #dee2e6;
+            margin: 20px 0;
+            background: #fdfdfd;
+        }
+
+        .pin-input:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.25 dark;
+            outline: none;
+        }
+
+        .btn-ingresar {
+            background-color: #007bff;
+            border: none;
+            padding: 12px;
+            font-weight: 600;
+            border-radius: 10px;
+            transition: background 0.2s;
+        }
+
+        .btn-ingresar:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-cancelar {
+            background: transparent;
+            color: #6c757d;
+            border: none;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .btn-cancelar:hover {
+            color: #343a40;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2 class="text-center main-title">¿Quién está repartiendo hoy?</h2>
+    <p class="text-center text-muted">Seleccioná tu usuario para ingresar al sistema</p>
+
+    <div class="chofer-grid">
+        {% for chofer in choferes %}
+        <div class="chofer-card"
+             onclick="abrirPin('{{ chofer.id }}', '{{ chofer.nombre_completo }}')">
+            <div class="chofer-avatar">👤</div>
+            <div class="chofer-nombre">{{ chofer.nombre_completo }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="pin-modal" id="pinModal">
+    <div class="pin-box">
+        <small class="text-uppercase text-muted fw-bold">Ingresar PIN para</small>
+        <h4 id="pinTitulo" class="mt-1 mb-4"></h4>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-danger py-2 mt-2" style="font-size: 14px;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="chofer_id" id="choferId">
+
+            <input type="password"
+                   name="pin"
+                   class="form-control pin-input"
+                   maxlength="6"
+                   placeholder="••••"
+                   inputmode="numeric"
+                   required
+                   autocomplete="one-time-code">
+
+            <button class="btn btn-primary btn-ingresar w-100">Confirmar Ingreso</button>
+            <button type="button" class="btn btn-cancelar w-100"
+                    onclick="cerrarPin()">Volver atrás</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirPin(id, nombre) {
+    document.getElementById('pinModal').style.display = 'flex';
+    document.getElementById('choferId').value = id;
+    document.getElementById('pinTitulo').innerText = nombre;
+    // Auto focus al abrir
+    setTimeout(() => {
+        document.querySelector('.pin-input').focus();
+    }, 100);
+}
+
+function cerrarPin() {
+    document.getElementById('pinModal').style.display = 'none';
+}
+
+// Cerrar modal al hacer click fuera de la caja blanca
+window.onclick = function(event) {
+    let modal = document.getElementById('pinModal');
+    if (event.target == modal) {
+        cerrarPin();
+    }
+}
+</script>
+
+</body>
+</html>
