@@ -197,99 +197,102 @@ def panel_alertas(request):
 # ==================================
 @login_required
 def lista_clientes(request):
-    clientes = Cliente.objects.all()
-    return render(request, 'lista_clientes.html', {'clientes': clientes})
+
+    # 🔥 Si es superusuario → ve todo
+    if request.user.is_superuser:
+        clientes = Cliente.objects.all()
+
+    else:
+        perfil = request.user.perfilusuario
+
+        # 🔹 Usuario ventas → solo sus clientes
+        if perfil.tipo == 'ventas':
+            clientes = Cliente.objects.filter(usuario=request.user)
+
+        # 🔹 Administrativo → todos
+        elif perfil.tipo == 'administrativo':
+            clientes = Cliente.objects.all()
+
+        # 🔹 Otros (camiones)
+        else:
+            clientes = Cliente.objects.none()
+
+    return render(request, 'lista_clientes.html', {
+        'clientes': clientes
+    })
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .models import Cliente
+
 
 @login_required
 def crear_cliente(request):
     if request.method == 'POST':
         nombre_completo = request.POST.get('nombre_completo')
         nombre_local = request.POST.get('nombre_local')
-        cuil = request.POST.get('cuil')  # 🆕 NUEVO
+        cuil = request.POST.get('cuil')
         email = request.POST.get('email')
         telefono = request.POST.get('telefono')
         direccion = request.POST.get('direccion')
-        
+
         if nombre_completo:
             Cliente.objects.create(
+                usuario=request.user,  # 🔥 ACA SE GUARDA EL USUARIO LOGUEADO
                 nombre_completo=nombre_completo,
                 nombre_local=nombre_local if nombre_local else None,
-                cuil=cuil if cuil else None,  # 🆕 NUEVO
+                cuil=cuil if cuil else None,
                 email=email if email else None,
                 telefono=telefono if telefono else None,
                 direccion=direccion if direccion else None
             )
+
             messages.success(request, 'Cliente creado correctamente')
             return redirect('lista_clientes')
-    
+
     return render(request, 'crear_cliente.html')
 @login_required
 def editar_cliente(request, cliente_id):
+
     cliente = get_object_or_404(Cliente, id=cliente_id)
-    
+
+    perfil = getattr(request.user, 'perfilusuario', None)
+
+    # 🔒 Si es ventas, solo puede editar sus propios clientes
+    if not request.user.is_superuser and perfil.tipo == 'ventas':
+        if cliente.usuario != request.user:
+            messages.error(request, "No tenés permiso para editar este cliente.")
+            return redirect('lista_clientes')
+
+    # 🔥 Lista de vendedores (solo para admin y superuser)
+    vendedores = None
+    if request.user.is_superuser or perfil.tipo == 'administrativo':
+        vendedores = User.objects.filter(perfilusuario__tipo='ventas')
+
     if request.method == 'POST':
+
         cliente.nombre_completo = request.POST.get('nombre_completo')
         cliente.nombre_local = request.POST.get('nombre_local')
         cliente.email = request.POST.get('email') or None
         cliente.telefono = request.POST.get('telefono') or None
         cliente.direccion = request.POST.get('direccion') or None
+
+        # 🔥 Solo admin o superusuario pueden cambiar vendedor
+        if request.user.is_superuser or perfil.tipo == 'administrativo':
+            nuevo_usuario_id = request.POST.get('usuario')
+            if nuevo_usuario_id:
+                cliente.usuario = User.objects.get(id=nuevo_usuario_id)
+
         cliente.save()
-        
-        messages.success(request, f'Cliente "{cliente.nombre_completo}" actualizado')
+
+        messages.success(request, "Cliente actualizado correctamente.")
         return redirect('lista_clientes')
-    
-    return render(request, 'editar_cliente.html', {'cliente': cliente})
 
-
-# ==================================
-# CHOFERES
-# ==================================
-@login_required
-def lista_choferes(request):
-    choferes = Chofer.objects.all()
-    return render(request, 'envios/lista_choferes.html', {'choferes': choferes})
-
-@login_required
-def crear_chofer(request):
-    if request.method == 'POST':
-        nombre = request.POST.get('nombre_completo')
-        telefono = request.POST.get('telefono')
-        vehiculo = request.POST.get('vehiculo')
-        pin = request.POST.get('pin')
-        notas = request.POST.get('notas')
-
-        if nombre and telefono and vehiculo and pin:
-            Chofer.objects.create(
-                nombre_completo=nombre,
-                telefono=telefono,
-                vehiculo=vehiculo,
-                pin=pin,
-                notas=notas
-            )
-            messages.success(request, 'Chofer creado correctamente')
-            return redirect('lista_choferes')
-        else:
-            messages.error(request, 'Complete todos los campos obligatorios')
-
-    return render(request, 'envios/crear_chofer.html')
-
-@login_required
-def editar_chofer(request, chofer_id):
-    chofer = get_object_or_404(Chofer, id=chofer_id)
-    
-    if request.method == 'POST':
-        chofer.nombre_completo = request.POST.get('nombre_completo')
-        chofer.telefono = request.POST.get('telefono')
-        chofer.vehiculo = request.POST.get('vehiculo')
-        chofer.notas = request.POST.get('notas')
-        chofer.activo = request.POST.get('activo') == 'on'
-        chofer.save()
-        
-        messages.success(request, f'Chofer "{chofer.nombre_completo}" actualizado')
-        return redirect('lista_choferes')
-    
-    return render(request, 'envios/editar_chofer.html', {'chofer': chofer})
-
+    return render(request, 'editar_cliente.html', {
+        'cliente': cliente,
+        'vendedores': vendedores
+    })
 
 # ==================================
 # 🆕 VENTAS - VENDEDORES
@@ -365,6 +368,377 @@ def crear_venta(request):
     })
 
 
+@login_required
+def lista_ventas(request):
+    estado = request.GET.get('estado')
+    fecha = request.GET.get('fecha')
+
+    ventas = Ventas.objects.none()
+    hay_filtros = any([estado, fecha])
+
+    if hay_filtros:
+        ventas = Ventas.objects.filter(
+            usuario_creador=request.user  # ✅ CAMPO CORRECTO
+        )
+
+        if fecha:
+            ventas = ventas.filter(fecha_creacion__date=fecha)
+
+        if estado:
+            ventas = ventas.filter(estado=estado)
+
+        ventas = ventas.order_by('-fecha_creacion')
+
+    return render(request, 'ventas/lista_ventas.html', {
+        'ventas': ventas,
+        'estado': estado,
+        'fecha': fecha,
+        'estados': Ventas.ESTADO_CHOICES,
+        'hay_filtros': hay_filtros,
+    })
+
+@login_required
+def detalle_venta(request, venta_id):
+    """Ver detalles de una venta con opción de asignar chofer"""
+    venta = get_object_or_404(Ventas, id=venta_id)
+    detalles = venta.detalles.select_related('producto').all()
+    choferes = Chofer.objects.filter(activo=True).order_by('nombre_completo')
+    
+    return render(request, 'ventas/detalle_venta.html', {
+        'venta': venta,
+        'detalles': detalles,
+        'choferes': choferes  # 👈 ESTO ES LO IMPORTANTE
+    })
+
+
+@login_required
+def actualizar_estado_venta(request, venta_id):
+    """
+    Cambiar estado: pendiente ↔ confirmada ↔ cancelada
+    CON DEVOLUCIÓN DE STOCK SI SE CANCELA UNA VENTA CONFIRMADA
+    """
+    venta = get_object_or_404(Ventas, id=venta_id)
+    
+    if request.method == 'POST':
+        nuevo_estado = request.POST.get('estado')
+        
+        # Validar transiciones permitidas
+        transiciones_permitidas = {
+            'pendiente': ['confirmada', 'cancelada'],
+            'confirmada': ['pendiente', 'cancelada', 'enviada'],
+            'enviada': ['entregada'],  
+            'entregada': [],
+            'cancelada': []
+        }
+        
+        if nuevo_estado not in transiciones_permitidas.get(venta.estado, []):
+            messages.error(
+                request, 
+                f'❌ No se puede cambiar de "{venta.get_estado_display()}" a "{dict(Ventas.ESTADO_CHOICES).get(nuevo_estado)}"'
+            )
+            return redirect('detalle_venta', venta_id=venta_id)
+        
+        # 🚨 SI SE CANCELA UNA VENTA CONFIRMADA, DEVOLVER STOCK
+        if nuevo_estado == 'cancelada' and venta.estado == 'confirmada':
+            try:
+                detalles = venta.detalles.select_related('producto').all()
+                for detalle in detalles:
+                    producto = detalle.producto
+                    producto.cantidad = F('cantidad') + detalle.cantidad
+                    producto.save()
+                    producto.refresh_from_db()
+                
+                venta.estado = nuevo_estado
+                venta.save()
+                messages.success(request, '✅ Venta cancelada y stock devuelto')
+                
+            except Exception as e:
+                messages.error(request, f'❌ Error al devolver stock: {str(e)}')
+        
+        # 🚨 SI SE VUELVE A PENDIENTE DESDE CONFIRMADA, DEVOLVER STOCK
+        elif nuevo_estado == 'pendiente' and venta.estado == 'confirmada':
+            try:
+                detalles = venta.detalles.select_related('producto').all()
+                for detalle in detalles:
+                    producto = detalle.producto
+                    producto.cantidad = F('cantidad') + detalle.cantidad
+                    producto.save()
+                    producto.refresh_from_db()
+                
+                venta.estado = nuevo_estado
+                venta.chofer = None  # Quitar chofer asignado
+                venta.save()
+                messages.success(request, '✅ Venta vuelta a pendiente y stock devuelto')
+                
+            except Exception as e:
+                messages.error(request, f'❌ Error al devolver stock: {str(e)}')
+        
+        else:
+            # Cambio normal de estado
+            venta.estado = nuevo_estado
+            venta.save()
+            messages.success(request, f'✅ Estado actualizado: {venta.get_estado_display()}')
+        
+        return redirect('detalle_venta', venta_id=venta_id)
+    
+    return render(request, 'ventas/actualizar_estado.html', {
+        'venta': venta,
+        'estados': Ventas.ESTADO_CHOICES
+    })
+
+# ==================================
+# CONSULTAR VENTAS (REPORTES)
+# ==================================
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from django.contrib.auth.models import User
+
+@login_required
+def consultar_ventas(request):
+    """
+    Consultar SOLO ventas ENTREGADAS con análisis de ganancia
+    """
+
+    productos = Producto.objects.all()
+    clientes = Cliente.objects.all().order_by('nombre_completo')
+
+    # ✅ SOLO USUARIOS DE VENTAS
+    usuarios = User.objects.filter(
+        is_active=True,
+        perfilusuario__tipo="ventas"
+    ).order_by('username')
+
+    fecha_desde = request.GET.get('desde')
+    fecha_hasta = request.GET.get('hasta')
+    cliente_id = request.GET.get('cliente')
+    producto_id = request.GET.get('producto')
+    usuario_id = request.GET.get('usuario')
+    exportar = request.GET.get('exportar')
+
+    # 🎯 SOLO ENTREGADAS
+    ventas = Ventas.objects.filter(
+        estado='entregada'
+    ).select_related(
+        'cliente',
+        'usuario_creador'
+    ).prefetch_related(
+        'detalles__producto'
+    )
+
+    if fecha_desde:
+        ventas = ventas.filter(fecha_envio__date__gte=fecha_desde)
+    if fecha_hasta:
+        ventas = ventas.filter(fecha_envio__date__lte=fecha_hasta)
+    if cliente_id:
+        ventas = ventas.filter(cliente_id=cliente_id)
+    if producto_id:
+        ventas = ventas.filter(detalles__producto_id=producto_id).distinct()
+    if usuario_id:
+        ventas = ventas.filter(usuario_creador_id=usuario_id)
+
+    ventas = ventas.order_by('-fecha_envio')
+
+    # 🧮 Totales
+    total_ventas = 0
+    total_costo = 0
+
+    for venta in ventas:
+        for detalle in venta.detalles.all():
+            total_ventas += detalle.subtotal
+            total_costo += (detalle.producto.valor_compra or 0) * detalle.cantidad
+
+    ganancia_total = total_ventas - total_costo
+
+    # 📊 Exportar
+    if exportar == 'excel':
+        return exportar_ventas_excel(ventas, fecha_desde, fecha_hasta)
+
+    return render(request, 'consultar_ventas.html', {
+        'ventas': ventas,
+        'productos': productos,
+        'clientes': clientes,
+        'usuarios': usuarios,  # 👈 ahora SOLO ventas
+        'total_ventas': total_ventas,
+        'total_costo': total_costo,
+        'ganancia_total': ganancia_total,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'cliente_id': cliente_id,
+        'producto_id': producto_id,
+        'usuario_id': usuario_id,
+    })
+
+def exportar_ventas_excel(ventas, fecha_desde, fecha_hasta):
+    """
+    Exporta las ventas a Excel con análisis detallado
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte de Ventas"
+    
+    # 🎨 Estilos
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=12)
+    title_font = Font(bold=True, size=14)
+    
+    # 📋 Título
+    ws.merge_cells('A1:J1')
+    ws['A1'] = f'REPORTE DE VENTAS ENTREGADAS'
+    ws['A1'].font = title_font
+    ws['A1'].alignment = Alignment(horizontal='center')
+    
+    if fecha_desde or fecha_hasta:
+        ws.merge_cells('A2:J2')
+        periodo = f"Periodo: {fecha_desde or 'Inicio'} hasta {fecha_hasta or 'Hoy'}"
+        ws['A2'] = periodo
+        ws['A2'].alignment = Alignment(horizontal='center')
+        fila_inicio = 4
+    else:
+        fila_inicio = 3
+    
+    # 📊 Encabezados
+    headers = [
+        'Fecha Entrega', 'Venta #', 'Cliente', 'Vendedor', 'Producto', 
+        'Cantidad', 'Precio Compra Unit.', 'Precio Venta Unit.', 
+        'Costo Total', 'Venta Total', 'Ganancia'
+    ]
+    
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=fila_inicio, column=col)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    
+    # 📝 Datos
+    fila = fila_inicio + 1
+    total_costo = 0
+    total_venta = 0
+    total_ganancia = 0
+    
+    for venta in ventas:
+        for detalle in venta.detalles.all():
+            costo_unit = detalle.producto.valor_compra or 0
+            precio_unit = detalle.precio_unitario
+            cantidad = detalle.cantidad
+            
+            costo_total = costo_unit * cantidad
+            venta_total = detalle.subtotal
+            ganancia = venta_total - costo_total
+            
+            ws.cell(row=fila, column=1).value = venta.fecha_envio.strftime('%d/%m/%Y %H:%M') if venta.fecha_envio else 'N/A'
+            ws.cell(row=fila, column=2).value = venta.id
+            ws.cell(row=fila, column=3).value = venta.cliente.nombre_completo
+            ws.cell(row=fila, column=4).value = venta.usuario_creador.username if venta.usuario_creador else 'N/A'
+            ws.cell(row=fila, column=5).value = detalle.producto.nombre
+            ws.cell(row=fila, column=6).value = cantidad
+            ws.cell(row=fila, column=7).value = float(costo_unit)
+            ws.cell(row=fila, column=8).value = float(precio_unit)
+            ws.cell(row=fila, column=9).value = float(costo_total)
+            ws.cell(row=fila, column=10).value = float(venta_total)
+            ws.cell(row=fila, column=11).value = float(ganancia)
+            
+            # Formato moneda
+            for col in [7, 8, 9, 10, 11]:
+                ws.cell(row=fila, column=col).number_format = '$#,##0.00'
+            
+            total_costo += costo_total
+            total_venta += venta_total
+            total_ganancia += ganancia
+            
+            fila += 1
+    
+    # 📊 TOTALES
+    fila += 1
+    ws.merge_cells(f'A{fila}:H{fila}')
+    ws.cell(row=fila, column=1).value = 'TOTALES'
+    ws.cell(row=fila, column=1).font = Font(bold=True, size=12)
+    ws.cell(row=fila, column=9).value = float(total_costo)
+    ws.cell(row=fila, column=10).value = float(total_venta)
+    ws.cell(row=fila, column=11).value = float(total_ganancia)
+    
+    for col in [9, 10, 11]:
+        cell = ws.cell(row=fila, column=col)
+        cell.font = Font(bold=True, size=12)
+        cell.number_format = '$#,##0.00'
+        cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    
+    # 📏 Ajustar anchos
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 10
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 30
+    ws.column_dimensions['F'].width = 10
+    ws.column_dimensions['G'].width = 18
+    ws.column_dimensions['H'].width = 18
+    ws.column_dimensions['I'].width = 15
+    ws.column_dimensions['J'].width = 15
+    ws.column_dimensions['K'].width = 15
+    
+    # 💾 Generar respuesta
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f'ventas_entregadas_{fecha_desde or "inicio"}_{fecha_hasta or "hoy"}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    wb.save(response)
+# ==================================
+# CHOFERES
+# ==================================
+@login_required
+def lista_choferes(request):
+    choferes = Chofer.objects.all()
+    return render(request, 'envios/lista_choferes.html', {'choferes': choferes})
+
+@login_required
+def crear_chofer(request):
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre_completo')
+        telefono = request.POST.get('telefono')
+        vehiculo = request.POST.get('vehiculo')
+        pin = request.POST.get('pin')
+        notas = request.POST.get('notas')
+
+        if nombre and telefono and vehiculo and pin:
+            Chofer.objects.create(
+                nombre_completo=nombre,
+                telefono=telefono,
+                vehiculo=vehiculo,
+                pin=pin,
+                notas=notas
+            )
+            messages.success(request, 'Chofer creado correctamente')
+            return redirect('lista_choferes')
+        else:
+            messages.error(request, 'Complete todos los campos obligatorios')
+
+    return render(request, 'envios/crear_chofer.html')
+
+@login_required
+def editar_chofer(request, chofer_id):
+    chofer = get_object_or_404(Chofer, id=chofer_id)
+    
+    if request.method == 'POST':
+        chofer.nombre_completo = request.POST.get('nombre_completo')
+        chofer.telefono = request.POST.get('telefono')
+        chofer.vehiculo = request.POST.get('vehiculo')
+        chofer.notas = request.POST.get('notas')
+        chofer.activo = request.POST.get('activo') == 'on'
+        chofer.save()
+        
+        messages.success(request, f'Chofer "{chofer.nombre_completo}" actualizado')
+        return redirect('lista_choferes')
+    
+    return render(request, 'envios/editar_chofer.html', {'chofer': chofer})
+
+
+# ==================================
+# 🆕 VENTAS - VENDEDORES
+# ==================================
+ 
 @login_required
 def lista_ventas(request):
     estado = request.GET.get('estado')

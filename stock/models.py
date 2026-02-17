@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 
 # Create your models here.
 class TipoProducto(models.Model):
@@ -63,34 +64,31 @@ class ImagenProducto(models.Model):
 #  MODELO: Cliente
 # ------------------------------
 class Cliente(models.Model):
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='cliente'
+    )
+
     nombre_completo = models.CharField(max_length=200, verbose_name="Nombre y Apellido")
     nombre_local = models.CharField(max_length=200, blank=True, null=True, verbose_name="Nombre del Local")
-    
-    # 🆕 CUIL/CUIT
+
     cuil = models.CharField(
-        max_length=13, 
-        blank=True, 
-        null=True, 
+        max_length=13,
+        blank=True,
+        null=True,
         verbose_name="CUIL/CUIT",
-        unique=True  # Opcional: si querés que sea único
+        unique=True
     )
-    
+
     email = models.EmailField(unique=True, blank=True, null=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     direccion = models.TextField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        verbose_name = "Cliente"
-        verbose_name_plural = "Clientes"
-        ordering = ['nombre_completo']
-    
-    def __str__(self):
-        if self.nombre_local:
-            return f"{self.nombre_completo} - {self.nombre_local}"
-        return self.nombre_completo
-    
 
+    def __str__(self):
+        return self.nombre_completo
 from django.db import models
 
 class Chofer(models.Model):
@@ -128,15 +126,33 @@ class Ventas(models.Model):
     NO descuenta stock hasta que estado = 'enviada'
     """
 
+    # ==============================
+    # ESTADOS
+    # ==============================
     ESTADO_CHOICES = [
         ('pendiente', 'Pendiente'),
         ('confirmada', 'Confirmada'),
-        ('enviada', 'Enviada'),      #  Aquí se descuenta stock
+        ('enviada', 'Enviada'),      # Aquí se descuenta stock
         ('entregada', 'Entregada'),
         ('cancelada', 'Cancelada'),
     ]
 
-    # 🆕 Usuario que creó/posteó la venta (cuando está pendiente)
+    # ==============================
+    # MÉTODOS DE PAGO
+    # ==============================
+    METODO_PAGO_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia'),
+        ('tarjeta_credito', 'Tarjeta de Crédito'),
+        ('tarjeta_debito', 'Tarjeta de Débito'),
+        ('cuenta_corriente', 'Cuenta Corriente'),
+    ]
+
+    # ==============================
+    # RELACIONES
+    # ==============================
+
+    # Usuario que creó la venta
     usuario_creador = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -146,22 +162,26 @@ class Ventas(models.Model):
         verbose_name="Usuario creador"
     )
 
+    # Cliente
     cliente = models.ForeignKey(
-        Cliente,
+        'Cliente',
         on_delete=models.CASCADE,
         verbose_name="Cliente"
     )
 
-    # Chofer asignado para el envío futuro
+    # Chofer asignado
     chofer = models.ForeignKey(
-        Chofer,
+        'Chofer',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="Chofer Asignado"
     )
 
-    # Fecha y hora programada para el envío
+    # ==============================
+    # FECHAS
+    # ==============================
+
     fecha_envio_programada = models.DateField(
         blank=True,
         null=True,
@@ -172,20 +192,6 @@ class Ventas(models.Model):
         blank=True,
         null=True,
         verbose_name="Hora Programada de Envío"
-    )
-
-    # Estado de la venta
-    estado = models.CharField(
-        max_length=20,
-        choices=ESTADO_CHOICES,
-        default='pendiente',
-        verbose_name="Estado"
-    )
-
-    valor_total = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0
     )
 
     fecha_creacion = models.DateTimeField(
@@ -199,16 +205,43 @@ class Ventas(models.Model):
         verbose_name="Fecha Real de Envío"
     )
 
-    # Información adicional
+    # ==============================
+    # CAMPOS PRINCIPALES
+    # ==============================
+
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='pendiente',
+        verbose_name="Estado"
+    )
+
+    metodo_pago = models.CharField(
+        max_length=30,
+        choices=METODO_PAGO_CHOICES,
+        default='efectivo',
+        verbose_name="Método de Pago"
+    )
+
+    valor_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Valor Total"
+    )
+
     notas = models.TextField(
         blank=True,
         null=True,
         verbose_name="Notas"
     )
 
+    # ==============================
+    # REGLAS DE NEGOCIO
+    # ==============================
+
     def save(self, *args, **kwargs):
-        # 🔒 Regla de negocio:
-        # Una venta en estado pendiente DEBE tener usuario creador
+        # Una venta pendiente debe tener usuario creador
         if self.estado == 'pendiente' and not self.usuario_creador:
             raise ValueError(
                 "Una venta en estado pendiente debe tener un usuario creador asignado"
@@ -216,21 +249,21 @@ class Ventas(models.Model):
 
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"Venta #{self.id} - {self.cliente} - {self.estado}"
-    
-    class Meta:
-        verbose_name = "Venta"
-        verbose_name_plural = "Ventas"
-        ordering = ['-fecha_creacion']
+    # ==============================
+    # MÉTODOS
+    # ==============================
 
-    def __str__(self):
-        return f"Venta #{self.id} - {self.cliente.nombre_completo} - {self.get_estado_display()}"
-    
     def calcular_total(self):
         """Calcula el total sumando todos los detalles"""
         return sum(detalle.subtotal for detalle in self.detalles.all())
 
+    def __str__(self):
+        return f"Venta #{self.id} - {self.cliente.nombre_completo} - {self.get_estado_display()}"
+
+    class Meta:
+        verbose_name = "Venta"
+        verbose_name_plural = "Ventas"
+        ordering = ['-fecha_creacion']
 
 class DetalleVenta(models.Model):
     """

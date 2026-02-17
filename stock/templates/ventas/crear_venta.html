@@ -7,6 +7,10 @@
     <title>Crear Venta - Sistema Amarce</title>
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    
+    <!-- jsPDF para generar PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
     <style>
         .stock-error {
             color: #dc3545;
@@ -29,9 +33,54 @@
         .stock-ok.show {
             display: block;
         }
+        
+        /* Loader para cuando se genera el PDF */
+        .pdf-loader {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .pdf-loader.show {
+            display: flex;
+        }
+        .pdf-loader-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0d6efd;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-light">
+    <!-- Loader para PDF -->
+    <div class="pdf-loader" id="pdfLoader">
+        <div class="pdf-loader-content">
+            <div class="spinner"></div>
+            <h4>📄 Generando PDF de la venta...</h4>
+            <p>Por favor espera un momento</p>
+        </div>
+    </div>
+
     <div class="container mt-4">
         <div class="card shadow">
             <div class="card-header bg-primary text-white">
@@ -44,7 +93,7 @@
                     <!-- Cliente -->
                     <div class="mb-3">
                         <label class="form-label">Cliente <span class="text-danger">*</span></label>
-                        <select name="cliente" class="form-select" required>
+                        <select name="cliente" id="cliente-select" class="form-select" required>
                             <option value="">Seleccione un cliente</option>
                             {% for cliente in clientes %}
                             <option value="{{ cliente.id }}">{{ cliente }}</option>
@@ -63,7 +112,8 @@
                                         {% for producto in productos %}
                                         <option value="{{ producto.id }}" 
                                                 data-precio="{{ producto.valor }}" 
-                                                data-stock="{{ producto.cantidad }}">
+                                                data-stock="{{ producto.cantidad }}"
+                                                data-nombre="{{ producto.nombre }}">
                                             {{ producto.nombre }} - ${{ producto.valor }} (Stock: {{ producto.cantidad }})
                                         </option>
                                         {% endfor %}
@@ -88,13 +138,13 @@
                     <!-- Notas -->
                     <div class="mb-3">
                         <label class="form-label">Notas / Observaciones</label>
-                        <textarea name="notas" class="form-control" rows="3" 
+                        <textarea name="notas" id="notas-textarea" class="form-control" rows="3" 
                                   placeholder="Información adicional sobre el pedido..."></textarea>
                     </div>
 
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg" id="btn-crear-venta">
-                            Crear Venta
+                            Crear Venta y Generar PDF
                         </button>
                         <a href="{% url 'lista_ventas' %}" class="btn btn-secondary">Cancelar</a>
                     </div>
@@ -179,12 +229,204 @@
             }
         });
         
-        // ✅ PREVENIR SUBMIT SI HAY ERRORES
-        document.getElementById('form-venta').addEventListener('submit', function(e) {
-            if (!validarFormularioCompleto()) {
-                e.preventDefault();
-                alert('❌ No se puede crear la venta: hay productos con stock insuficiente');
+        // ✅ GENERAR PDF DE LA VENTA
+        function generarPDFVenta() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Obtener datos del formulario
+            const clienteSelect = document.getElementById('cliente-select');
+            const clienteNombre = clienteSelect.options[clienteSelect.selectedIndex].text;
+            const notas = document.getElementById('notas-textarea').value;
+            
+            // Obtener productos seleccionados
+            const productosItems = document.querySelectorAll('.producto-item');
+            let productos = [];
+            let total = 0;
+            
+            productosItems.forEach(item => {
+                const select = item.querySelector('.producto-select');
+                const cantidadInput = item.querySelector('.cantidad-input');
+                
+                if (select.value && cantidadInput.value) {
+                    const option = select.options[select.selectedIndex];
+                    const nombre = option.getAttribute('data-nombre');
+                    const precio = parseFloat(option.getAttribute('data-precio'));
+                    const cantidad = parseInt(cantidadInput.value);
+                    const subtotal = precio * cantidad;
+                    
+                    productos.push({
+                        nombre: nombre,
+                        precio: precio,
+                        cantidad: cantidad,
+                        subtotal: subtotal
+                    });
+                    
+                    total += subtotal;
+                }
+            });
+            
+            // Fecha actual
+            const fecha = new Date().toLocaleDateString('es-AR');
+            const hora = new Date().toLocaleTimeString('es-AR');
+            
+            // ========== DISEÑO DEL PDF ==========
+            
+            // Encabezado
+            doc.setFillColor(13, 110, 253); // Color azul
+            doc.rect(0, 0, 210, 40, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont(undefined, 'bold');
+            doc.text('SISTEMA AMARCE', 105, 20, { align: 'center' });
+            
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'normal');
+            doc.text('Comprobante de Venta', 105, 30, { align: 'center' });
+            
+            // Información de la venta
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(11);
+            
+            let y = 55;
+            doc.setFont(undefined, 'bold');
+            doc.text('Fecha:', 20, y);
+            doc.setFont(undefined, 'normal');
+            doc.text(fecha + ' - ' + hora, 50, y);
+            
+            y += 10;
+            doc.setFont(undefined, 'bold');
+            doc.text('Cliente:', 20, y);
+            doc.setFont(undefined, 'normal');
+            doc.text(clienteNombre, 50, y);
+            
+            // Línea separadora
+            y += 10;
+            doc.setDrawColor(200, 200, 200);
+            doc.line(20, y, 190, y);
+            
+            // Tabla de productos
+            y += 15;
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('PRODUCTOS', 105, y, { align: 'center' });
+            
+            y += 10;
+            doc.setFontSize(10);
+            
+            // Encabezados de tabla
+            doc.setFillColor(240, 240, 240);
+            doc.rect(20, y - 5, 170, 8, 'F');
+            
+            doc.text('Producto', 22, y);
+            doc.text('Cant.', 120, y);
+            doc.text('P. Unit.', 145, y);
+            doc.text('Subtotal', 175, y);
+            
+            y += 10;
+            doc.setFont(undefined, 'normal');
+            
+            // Productos
+            productos.forEach((prod, index) => {
+                if (y > 270) { // Nueva página si es necesario
+                    doc.addPage();
+                    y = 20;
+                }
+                
+                // Fondo alternado
+                if (index % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(20, y - 5, 170, 8, 'F');
+                }
+                
+                doc.text(prod.nombre, 22, y);
+                doc.text(prod.cantidad.toString(), 120, y);
+                doc.text('$' + prod.precio.toFixed(2), 145, y);
+                doc.text('$' + prod.subtotal.toFixed(2), 175, y);
+                
+                y += 8;
+            });
+            
+            // Línea antes del total
+            y += 5;
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.line(120, y, 190, y);
+            
+            // Total
+            y += 10;
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text('TOTAL:', 145, y);
+            doc.setFontSize(16);
+            doc.setTextColor(13, 110, 253);
+            doc.text('$' + total.toFixed(2), 175, y);
+            
+            // Notas (si hay)
+            if (notas.trim()) {
+                y += 15;
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'bold');
+                doc.text('Observaciones:', 20, y);
+                
+                y += 7;
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(10);
+                
+                // Dividir notas en líneas si es muy largo
+                const notasLineas = doc.splitTextToSize(notas, 170);
+                notasLineas.forEach(linea => {
+                    doc.text(linea, 20, y);
+                    y += 6;
+                });
             }
+            
+            // Pie de página
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text('Generado automáticamente por Sistema Amarce', 105, 285, { align: 'center' });
+            
+            // Guardar PDF
+            const nombreArchivo = `Venta_${clienteNombre.replace(/\s+/g, '_')}_${fecha.replace(/\//g, '-')}.pdf`;
+            doc.save(nombreArchivo);
+        }
+        
+        // ✅ PREVENIR SUBMIT Y GENERAR PDF
+        document.getElementById('form-venta').addEventListener('submit', function(e) {
+            e.preventDefault(); // Siempre prevenir el submit normal
+            
+            if (!validarFormularioCompleto()) {
+                alert('❌ No se puede crear la venta: hay productos con stock insuficiente');
+                return;
+            }
+            
+            // Mostrar loader
+            document.getElementById('pdfLoader').classList.add('show');
+            
+            // Pequeño delay para que se vea el loader
+            setTimeout(() => {
+                try {
+                    // Generar PDF
+                    generarPDFVenta();
+                    
+                    // Ocultar loader
+                    document.getElementById('pdfLoader').classList.remove('show');
+                    
+                    // Ahora sí enviar el formulario al backend
+                    alert('✅ PDF generado correctamente. Ahora se guardará la venta en el sistema.');
+                    
+                    // Enviar formulario normalmente
+                    e.target.submit();
+                    
+                } catch (error) {
+                    console.error('Error al generar PDF:', error);
+                    document.getElementById('pdfLoader').classList.remove('show');
+                    alert('⚠️ Hubo un error al generar el PDF, pero la venta se guardará de todas formas.');
+                    e.target.submit();
+                }
+            }, 300);
         });
         
         // ✅ AGREGAR PRODUCTOS DINÁMICAMENTE
