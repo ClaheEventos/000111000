@@ -147,35 +147,55 @@ def actualizar_stock(request, producto_id):
 
     return render(request, 'actualizar_stock.html', {'producto': producto})
 
+from decimal import Decimal, InvalidOperation
+
 @login_required
 def editar_producto(request, producto_id):
     producto = get_object_or_404(Producto, id=producto_id)
     tipos = TipoProducto.objects.all()
 
     if request.method == 'POST':
-        nombre = request.POST.get('nombre')
-        tipo_id = request.POST.get('tipo')
-        valor = request.POST.get('valor')
-        umbral_alerta = request.POST.get('umbral_alerta')
-        
-        producto.nombre = nombre
+        nombre        = request.POST.get('nombre', '').strip()
+        tipo_id       = request.POST.get('tipo')
+        valor         = request.POST.get('valor', '0')
+        valor_compra  = request.POST.get('valor_compra', '0')
+        cantidad      = request.POST.get('cantidad', '0')
+        umbral_alerta = request.POST.get('umbral_alerta', '5')
+
+        producto.nombre  = nombre
         producto.tipo_id = tipo_id
-        producto.valor = valor
-        
+
         try:
-            if umbral_alerta is not None:
-                producto.umbral_alerta = int(umbral_alerta)
+            producto.valor = Decimal(valor)
+        except InvalidOperation:
+            messages.error(request, 'El precio de venta no es válido.')
+            return redirect('editar_producto', producto_id=producto.id)
+
+        try:
+            producto.valor_compra = Decimal(valor_compra)
+        except InvalidOperation:
+            messages.error(request, 'El precio de compra no es válido.')
+            return redirect('editar_producto', producto_id=producto.id)
+
+        try:
+            producto.cantidad = int(cantidad)
+        except ValueError:
+            messages.error(request, 'La cantidad debe ser un número entero.')
+            return redirect('editar_producto', producto_id=producto.id)
+
+        try:
+            producto.umbral_alerta = int(umbral_alerta)
         except ValueError:
             messages.error(request, 'El umbral debe ser un número entero.')
             return redirect('editar_producto', producto_id=producto.id)
-            
+
         producto.save()
         messages.success(request, f'Producto "{producto.nombre}" actualizado.')
         return redirect('lista_productos')
 
     return render(request, 'editar_producto.html', {
         'producto': producto,
-        'tipos': tipos
+        'tipos': tipos,
     })
 
 @login_required
@@ -1491,6 +1511,7 @@ def acceso_chofer(request):
     })
 
 
+
 @login_required
 def chofer_detalle_venta_confirmada(request, venta_id):
     chofer_id = request.session.get('chofer_id')
@@ -1502,12 +1523,18 @@ def chofer_detalle_venta_confirmada(request, venta_id):
     if request.method == 'POST':
         nuevo_estado = request.POST.get('estado')
         notas = request.POST.get('notas_adicionales')
+        metodo_pago = request.POST.get('metodo_pago')
 
         # Validar estado
         estados_validos = [e[0] for e in Ventas.ESTADO_CHOICES]
         if nuevo_estado not in estados_validos:
             messages.error(request, 'Estado inválido')
             return redirect('chofer_detalle_venta_confirmada', venta_id=venta_id)
+
+        # Validar y guardar método de pago
+        metodos_validos = [m[0] for m in Ventas.METODO_PAGO_CHOICES]
+        if metodo_pago and metodo_pago in metodos_validos:
+            venta.metodo_pago = metodo_pago
 
         # Actualizar estado
         venta.estado = nuevo_estado
@@ -1529,8 +1556,10 @@ def chofer_detalle_venta_confirmada(request, venta_id):
         'venta': venta,
         'detalles': detalles,
         'chofer': venta.chofer,
-        'estados': Ventas.ESTADO_CHOICES
+        'estados': Ventas.ESTADO_CHOICES,
+        'metodos_pago': Ventas.METODO_PAGO_CHOICES,  # <-- agregado
     })
+
 @login_required
 def chofer_detalle_envio(request, envio_id):
     """
